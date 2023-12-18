@@ -1,118 +1,128 @@
-/**
- * Sample React Native App
- * https://github.com/facebook/react-native
- *
- * @format
- */
+import React, { useState, useRef } from 'react';
+import { View, Text, TextInput, TouchableOpacity } from 'react-native';
+import DateTimePicker from '@react-native-community/datetimepicker';
+import { Stopwatch } from 'react-native-stopwatch-timer';
 
-import React from 'react';
-import type {PropsWithChildren} from 'react';
-import {
-  SafeAreaView,
-  ScrollView,
-  StatusBar,
-  StyleSheet,
-  Text,
-  useColorScheme,
-  View,
-} from 'react-native';
+const calculateTemperatureDrop = (durationInSeconds, waterTemperature, weight) => {
+  const waterDensity = 1000;
+  const bodySpecificHeat = 3500;
 
-import {
-  Colors,
-  DebugInstructions,
-  Header,
-  LearnMoreLinks,
-  ReloadInstructions,
-} from 'react-native/Libraries/NewAppScreen';
+  const weightInKg = parseFloat(weight);
 
-type SectionProps = PropsWithChildren<{
-  title: string;
-}>;
+  const temperatureDrop = (waterTemperature - 37) * Math.exp(-(durationInSeconds / (60 * bodySpecificHeat * weightInKg / waterDensity)));
 
-function Section({children, title}: SectionProps): React.JSX.Element {
-  const isDarkMode = useColorScheme() === 'dark';
-  return (
-    <View style={styles.sectionContainer}>
-      <Text
-        style={[
-          styles.sectionTitle,
-          {
-            color: isDarkMode ? Colors.white : Colors.black,
-          },
-        ]}>
-        {title}
-      </Text>
-      <Text
-        style={[
-          styles.sectionDescription,
-          {
-            color: isDarkMode ? Colors.light : Colors.dark,
-          },
-        ]}>
-        {children}
-      </Text>
-    </View>
-  );
-}
+  return temperatureDrop.toFixed(2);
+};
 
-function App(): React.JSX.Element {
-  const isDarkMode = useColorScheme() === 'dark';
+const StartPage = () => {
+  const [weight, setWeight] = useState('');
+  const [temperature, setTemperature] = useState('');
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [date, setDate] = useState(new Date());
+  const [elapsedTime, setElapsedTime] = useState(0);
+  const [results, setResults] = useState({
+    timeInWater: 0,
+    temperatureDrop: 0,
+  });
+  const stopwatchRef = useRef();
 
-  const backgroundStyle = {
-    backgroundColor: isDarkMode ? Colors.darker : Colors.lighter,
+  const handleDateChange = (event, selectedDate) => {
+    setShowDatePicker(false);
+    if (selectedDate) {
+      setDate(selectedDate);
+    }
+  };
+
+  const handleStopwatchTime = (time) => {
+    setElapsedTime(time);
+  };
+
+  const startStopwatch = () => {
+    stopwatchRef.current.start();
+  };
+
+  const stopStopwatch = () => {
+    stopwatchRef.current.stop();
+    const durationInSeconds = elapsedTime;
+    const temperatureDrop = calculateTemperatureDrop(durationInSeconds, temperature, weight);
+
+    console.log(`Time in water: ${durationInSeconds} seconds`);
+    console.log(`Temperature drop: ${temperatureDrop} °C`);
+
+    setResults(prevResults => ({
+      ...prevResults,
+      timeInWater: durationInSeconds,
+      temperatureDrop: parseFloat(temperatureDrop),
+    }));
+  };
+
+  const resetStopwatch = () => {
+    stopwatchRef.current.reset();
+    setElapsedTime(0);
   };
 
   return (
-    <SafeAreaView style={backgroundStyle}>
-      <StatusBar
-        barStyle={isDarkMode ? 'light-content' : 'dark-content'}
-        backgroundColor={backgroundStyle.backgroundColor}
+    <View>
+      <Text>Enter your data:</Text>
+      <TextInput
+        placeholder="Weight (kg)"
+        keyboardType="numeric"
+        value={weight}
+        onChangeText={(text) => setWeight(text)}
       />
-      <ScrollView
-        contentInsetAdjustmentBehavior="automatic"
-        style={backgroundStyle}>
-        <Header />
-        <View
-          style={{
-            backgroundColor: isDarkMode ? Colors.black : Colors.white,
-          }}>
-          <Section title="Step One">
-            Edit <Text style={styles.highlight}>App.tsx</Text> to change this
-            screen and then come back to see your edits.
-          </Section>
-          <Section title="See Your Changes">
-            <ReloadInstructions />
-          </Section>
-          <Section title="Debug">
-            <DebugInstructions />
-          </Section>
-          <Section title="Learn More">
-            Read the docs to discover what to do next:
-          </Section>
-          <LearnMoreLinks />
-        </View>
-      </ScrollView>
-    </SafeAreaView>
+      <TextInput
+        placeholder="Water Temperature (°C)"
+        keyboardType="numeric"
+        value={temperature}
+        onChangeText={(text) => setTemperature(text)}
+      />
+      <TouchableOpacity onPress={() => setShowDatePicker(true)}>
+        <Text>Select Date and Time</Text>
+      </TouchableOpacity>
+      {showDatePicker && (
+        <DateTimePicker
+          value={date}
+          mode="datetime"
+          display="default"
+          onChange={handleDateChange}
+        />
+      )}
+      <Stopwatch
+        laps
+        start={false}
+        options={options}
+        getTime={(time) => handleStopwatchTime(time)}
+        ref={stopwatchRef}
+      />
+      <TouchableOpacity onPress={startStopwatch}>
+        <Text>Start Stopwatch</Text>
+      </TouchableOpacity>
+      <TouchableOpacity onPress={stopStopwatch}>
+        <Text>Stop Stopwatch</Text>
+      </TouchableOpacity>
+      <TouchableOpacity onPress={resetStopwatch}>
+        <Text>Reset Stopwatch</Text>
+      </TouchableOpacity>
+      <View>
+        <Text>Time in Water: {results.timeInWater} seconds</Text>
+        <Text>Temperature Drop: {results.temperatureDrop} °C</Text>
+      </View>
+    </View>
   );
-}
+};
 
-const styles = StyleSheet.create({
-  sectionContainer: {
-    marginTop: 32,
-    paddingHorizontal: 24,
+const options = {
+  container: {
+    backgroundColor: '#FFF',
+    padding: 5,
+    borderRadius: 5,
+    width: 220,
   },
-  sectionTitle: {
-    fontSize: 24,
-    fontWeight: '600',
+  text: {
+    fontSize: 30,
+    color: '#000',
+    marginLeft: 7,
   },
-  sectionDescription: {
-    marginTop: 8,
-    fontSize: 18,
-    fontWeight: '400',
-  },
-  highlight: {
-    fontWeight: '700',
-  },
-});
+};
 
-export default App;
+export default StartPage;

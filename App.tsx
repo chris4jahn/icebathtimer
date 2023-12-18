@@ -1,128 +1,125 @@
-import React, { useState, useRef } from 'react';
-import { View, Text, TextInput, TouchableOpacity } from 'react-native';
-import DateTimePicker from '@react-native-community/datetimepicker';
-import { Stopwatch } from 'react-native-stopwatch-timer';
+import React, { useState } from 'react';
+import { StyleSheet, Text, View, TextInput, TouchableOpacity, Alert } from 'react-native';
+import { Calendar } from 'react-native-calendars';
 
-const calculateTemperatureDrop = (durationInSeconds, waterTemperature, weight) => {
-  const waterDensity = 1000;
-  const bodySpecificHeat = 3500;
-
-  const weightInKg = parseFloat(weight);
-
-  const temperatureDrop = (waterTemperature - 37) * Math.exp(-(durationInSeconds / (60 * bodySpecificHeat * weightInKg / waterDensity)));
-
+const calculateTemperatureDrop = (duration, waterTemperature, bodyWeight) => {
+  const specificHeatCapacity = 3.5; // kJ/kg/°C
+  const bodySurfaceArea = 0.20247 * Math.pow(bodyWeight, 0.425) * Math.pow(170, 0.725); // m²
+  const waterDensity = 1000; // kg/m³
+  const waterVolume = bodyWeight * 0.6; // L
+  const temperatureDrop = (specificHeatCapacity * bodyWeight * bodySurfaceArea * duration) / (waterVolume * waterDensity * (waterTemperature - 0.1));
   return temperatureDrop.toFixed(2);
 };
 
-const StartPage = () => {
-  const [weight, setWeight] = useState('');
-  const [temperature, setTemperature] = useState('');
-  const [showDatePicker, setShowDatePicker] = useState(false);
-  const [date, setDate] = useState(new Date());
+export default function App() {
+  const [bodyWeight, setBodyWeight] = useState('');
+  const [waterTemperature, setWaterTemperature] = useState('');
+  const [stopwatchTime, setStopwatchTime] = useState(0);
+  const [stopwatchRunning, setStopwatchRunning] = useState(false);
+  const [startTime, setStartTime] = useState(0);
   const [elapsedTime, setElapsedTime] = useState(0);
-  const [results, setResults] = useState({
-    timeInWater: 0,
-    temperatureDrop: 0,
-  });
-  const stopwatchRef = useRef();
+  const [selectedDate, setSelectedDate] = useState('');
 
-  const handleDateChange = (event, selectedDate) => {
-    setShowDatePicker(false);
-    if (selectedDate) {
-      setDate(selectedDate);
-    }
-  };
-
-  const handleStopwatchTime = (time) => {
-    setElapsedTime(time);
-  };
-
-  const startStopwatch = () => {
-    stopwatchRef.current.start();
-  };
+  function startStopwatch() {
+    setStopwatchRunning(true);
+    setStartTime(Date.now());
+  }
 
   const stopStopwatch = () => {
-    stopwatchRef.current.stop();
-    const durationInSeconds = elapsedTime;
-    const temperatureDrop = calculateTemperatureDrop(durationInSeconds, temperature, weight);
-
-    console.log(`Time in water: ${durationInSeconds} seconds`);
-    console.log(`Temperature drop: ${temperatureDrop} °C`);
-
-    setResults(prevResults => ({
-      ...prevResults,
-      timeInWater: durationInSeconds,
-      temperatureDrop: parseFloat(temperatureDrop),
-    }));
-  };
-
-  const resetStopwatch = () => {
-    stopwatchRef.current.reset();
-    setElapsedTime(0);
+    setStopwatchRunning(false);
+    setStopwatchTime(stopwatchTime + Date.now() - startTime);
+    const duration = stopwatchTime + Date.now() - startTime;
+    const temperatureDrop = calculateTemperatureDrop(duration, waterTemperature, bodyWeight);
+    Alert.alert(
+      'Eisbad abgeschlossen',
+      `Sie waren ${duration / 1000} Sekunden im Wasser und Ihre Körpertemperatur ist um ${temperatureDrop} Grad Celsius gesunken.`,
+      [
+        {
+          text: 'OK',
+          onPress: () => console.log('OK Pressed'),
+        },
+      ],
+      { cancelable: false }
+    );
   };
 
   return (
-    <View>
-      <Text>Enter your data:</Text>
+    <View style={styles.container}>
+      <Text style={styles.label}>Körpergewicht (kg)</Text>
       <TextInput
-        placeholder="Weight (kg)"
+        style={styles.input}
+        onChangeText={setBodyWeight}
+        value={bodyWeight}
         keyboardType="numeric"
-        value={weight}
-        onChangeText={(text) => setWeight(text)}
       />
+      <Text style={styles.label}>Wassertemperatur (°C)</Text>
       <TextInput
-        placeholder="Water Temperature (°C)"
+        style={styles.input}
+        onChangeText={setWaterTemperature}
+        value={waterTemperature}
         keyboardType="numeric"
-        value={temperature}
-        onChangeText={(text) => setTemperature(text)}
       />
-      <TouchableOpacity onPress={() => setShowDatePicker(true)}>
-        <Text>Select Date and Time</Text>
+      <TouchableOpacity
+        style={styles.button}
+        onPress={stopwatchRunning ? stopStopwatch : startStopwatch}
+      >
+        <Text style={styles.buttonText}>
+          {stopwatchRunning ? 'Stop' : 'Start'} 
+        </Text>
       </TouchableOpacity>
-      {showDatePicker && (
-        <DateTimePicker
-          value={date}
-          mode="datetime"
-          display="default"
-          onChange={handleDateChange}
-        />
+      {stopwatchTime > 0 && (
+        <Text style={styles.duration}>
+          Dauer des Eisbads: {stopwatchTime / 1000} Sekunden
+        </Text>
       )}
-      <Stopwatch
-        laps
-        start={false}
-        options={options}
-        getTime={(time) => handleStopwatchTime(time)}
-        ref={stopwatchRef}
+      <Calendar
+        style={styles.calendar}
+        onDayPress={(day) => setSelectedDate(day.dateString)}
+        markedDates={{
+          [selectedDate]: { selected: true, marked: true },
+        }}
       />
-      <TouchableOpacity onPress={startStopwatch}>
-        <Text>Start Stopwatch</Text>
-      </TouchableOpacity>
-      <TouchableOpacity onPress={stopStopwatch}>
-        <Text>Stop Stopwatch</Text>
-      </TouchableOpacity>
-      <TouchableOpacity onPress={resetStopwatch}>
-        <Text>Reset Stopwatch</Text>
-      </TouchableOpacity>
-      <View>
-        <Text>Time in Water: {results.timeInWater} seconds</Text>
-        <Text>Temperature Drop: {results.temperatureDrop} °C</Text>
-      </View>
     </View>
   );
-};
+}
 
-const options = {
+const styles = StyleSheet.create({
   container: {
-    backgroundColor: '#FFF',
-    padding: 5,
-    borderRadius: 5,
-    width: 220,
+    flex: 1,
+    backgroundColor: '#fff',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  text: {
-    fontSize: 30,
-    color: '#000',
-    marginLeft: 7,
+  label: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginVertical: 10,
   },
-};
-
-export default StartPage;
+  input: {
+    borderWidth: 1,
+    borderColor: '#ccc',
+    borderRadius: 4,
+    padding: 10,
+    width: '80%',
+    marginBottom: 20,
+    fontSize: 20,
+  },
+  button: {
+    backgroundColor: '#007aff',
+    padding: 10,
+    borderRadius: 4,
+  },
+  buttonText: {
+    color: '#fff',
+    fontSize: 20,
+    fontWeight: 'bold',
+  },
+  duration: {
+    fontSize: 16,
+    marginTop: 20,
+  },
+  calendar: {
+    marginTop: 20,
+    marginBottom: 20,
+  },
+});
